@@ -1,3 +1,9 @@
+this is a clone of [`@purduehackers/time`](https://github.com/purduehackers/time) built to be published on the new https://jsr.io registry, which i just got access to.
+
+i'm just playing around here. all real updates will be added to the original repo.
+
+---
+
 # Lightning Time ⚡️
 
 Lightning Time ⚡️ is a new way to measure time. It's a spin on hexadecimal time: the day is split into 16 parts over and over.
