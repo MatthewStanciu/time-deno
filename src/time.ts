@@ -1,0 +1,137 @@
+import rgbHex from 'npm:rgb-hex@3.0.0'
+import getParts from './utils/get-parts.ts'
+import msToTime from './utils/ms-to-time.ts'
+import validate from './utils/validate-lightning-string.ts'
+import validateCustomColors from './utils/validate-custom-colors.ts'
+import stripCharges from './utils/strip-charges.ts'
+import {
+  Colors,
+  LightningTimeObject,
+  LightningTimeParts,
+  StaticColors
+} from './types/index.ts'
+
+export const MILLIS_PER_CHARGE = 1318.359375 // 86400000 / 16^4
+
+export class LightningTime {
+  staticColors: StaticColors
+
+  constructor(customColors?: {
+    staticBoltColors?: number[]
+    staticZapColors?: number[]
+    staticSparkColors?: number[]
+  }) {
+    const boltColors = customColors?.staticBoltColors || [161, 0]
+    const zapColors = customColors?.staticZapColors || [50, 214]
+    const sparkColors = customColors?.staticSparkColors || [246, 133]
+    validateCustomColors(boltColors, zapColors, sparkColors)
+
+    this.staticColors = { boltColors, zapColors, sparkColors }
+  }
+
+  setStaticColors(customColors?: {
+    staticBoltColors?: number[]
+    staticZapColors?: number[]
+    staticSparkColors?: number[]
+  }) {
+    const boltColors =
+      customColors?.staticBoltColors || this.staticColors.boltColors
+    const zapColors =
+      customColors?.staticZapColors || this.staticColors.zapColors
+    const sparkColors =
+      customColors?.staticSparkColors || this.staticColors.sparkColors
+    validateCustomColors(boltColors, zapColors, sparkColors)
+
+    this.staticColors = { boltColors, zapColors, sparkColors }
+  }
+
+  convertToLightning(time: Date): LightningTimeObject {
+    const millis =
+      1000 * 60 * 60 * time.getHours() +
+      1000 * 60 * time.getMinutes() +
+      1000 * time.getSeconds() +
+      time.getMilliseconds()
+    const totalCharges = millis / MILLIS_PER_CHARGE
+    const totalSparks = totalCharges / 16
+    const totalZaps = totalSparks / 16
+    const totalBolts = totalZaps / 16
+
+    const charges = (Math.floor(totalCharges) % 16).toString(16)
+    const sparks = (Math.floor(totalSparks) % 16).toString(16)
+    const zaps = (Math.floor(totalZaps) % 16).toString(16)
+    const bolts = (Math.floor(totalBolts) % 16).toString(16)
+
+    const lightningString = bolts + '~' + zaps + '~' + sparks + '|' + charges
+    return {
+      lightningString,
+      strippedCharges: stripCharges(lightningString),
+      colors: this.getColors(lightningString),
+      parts: {
+        bolts,
+        zaps,
+        sparks,
+        charges
+      }
+    }
+  }
+
+  getParts(lightningString: string): LightningTimeParts {
+    return getParts(lightningString).toString()
+  }
+
+  stripCharges(lightningString: string): string {
+    return stripCharges(lightningString)
+  }
+
+  convertFromLightning(lightningString: string): Date {
+    const isValid = validate(lightningString)
+    if (!isValid) {
+      throw new Error(
+        `lightning string ${lightningString} is in an invalid format`
+      )
+    }
+
+    const { bolts, zaps, sparks, charges } = getParts(lightningString)
+
+    let elapsed = (bolts * 16 + zaps) * 16 + sparks
+    if (charges > 0) {
+      elapsed = elapsed * 16 + charges
+    }
+    const millis = (elapsed * 86400000) / (charges > 0 ? 65536 : 4096)
+
+    return msToTime(millis)
+  }
+
+  getColors(lightningString: string): Colors {
+    const isValid = validate(lightningString)
+    if (!isValid) {
+      throw new Error(
+        `lightning string ${lightningString} is in an invalid format`
+      )
+    }
+
+    const { bolts, zaps, sparks, charges } = getParts(lightningString)
+    const staticColors = this.staticColors
+    const boltColor = rgbHex(
+      bolts * 16 + zaps,
+      staticColors.boltColors[0],
+      staticColors.boltColors[1]
+    )
+    const zapColor = rgbHex(
+      staticColors.zapColors[0],
+      zaps * 16 + sparks,
+      staticColors.zapColors[1]
+    )
+    const sparkColor = rgbHex(
+      staticColors.sparkColors[0],
+      staticColors.sparkColors[1],
+      sparks * 16 + charges
+    )
+
+    return {
+      boltColor: `#${boltColor}`,
+      zapColor: `#${zapColor}`,
+      sparkColor: `#${sparkColor}`
+    }
+  }
+}

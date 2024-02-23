@@ -1,0 +1,5 @@
+{
+  "name": "@purduehackers/time",
+  "version": "0.0.1",
+  "exports": "./src/time.ts"
+}
